@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
+using System.Text;
 using System.Windows.Forms;
 
 namespace colorGame
@@ -8,59 +10,68 @@ namespace colorGame
     public partial class Form1 : Form
     {
         Random random = new Random();
-        Timer colorTimer = new Timer(); //timer initialization 
+        Timer colorTimer = new Timer();
         DateTime startTime;
         List<PictureBox> colorBoxes;
-        Color? selectedColor = null;
-        Color finalColor;
+        Color finalColor1, finalColor2, finalColor3;
         int win = 0;
         int lose = 0;
         double timeLeft = 5.0;
-
-        //fun fact pede kayo mag change ng ID para ndi generalize ung name example pictureBox1 pede nyo yan irename ung ID
-        //make sure na pag nirename nyo irerename nyo rin ung iba dito
+        double playerMoney = 10.0;
+        string divider = "--------------------------------------------------";
+        Dictionary<PictureBox, Color> colorMap = new Dictionary<PictureBox, Color>();
+        Dictionary<Color, int> betsPerColor = new Dictionary<Color, int>();
+        //kita mo?
         public Form1()
         {
             InitializeComponent();
 
-            //setting up the speed of color rotation
             colorTimer.Interval = 100;
             colorTimer.Tick += Timer1_Tick;
 
-            //adding a borderstyle for the random color box
-            genBox.BorderStyle = BorderStyle.Fixed3D; 
+            Dice1.BorderStyle = BorderStyle.Fixed3D; //itong mga to style lanng yan
+            Dice2.BorderStyle = BorderStyle.Fixed3D;
+            Dice3.BorderStyle = BorderStyle.Fixed3D;
 
-            //color selection
             colorBox1.BackColor = Color.Yellow;
             colorBox2.BackColor = Color.Pink;
             colorBox3.BackColor = Color.Red;
             colorBox6.BackColor = Color.Orange;
             colorBox5.BackColor = Color.White;
             colorBox4.BackColor = Color.Blue;
+
+            colorMap[colorBox1] = Color.Yellow;
+            colorMap[colorBox2] = Color.Pink;
+            colorMap[colorBox3] = Color.Red;
+            colorMap[colorBox6] = Color.Orange;
+            colorMap[colorBox5] = Color.White;
+            colorMap[colorBox4] = Color.Blue;
+
+            betsPerColor[Color.Yellow] = 0;
+            betsPerColor[Color.Pink] = 0;
+            betsPerColor[Color.Red] = 0;
+            betsPerColor[Color.Orange] = 0;
+            betsPerColor[Color.White] = 0;
+            betsPerColor[Color.Blue] = 0;
         }
 
         private void Form1_Load(object sender, EventArgs e)
         {
-            //setting up color boxess
             colorBoxes = new List<PictureBox> { colorBox1, colorBox2, colorBox3, colorBox6, colorBox5, colorBox4 };
-        }
-
-        private void DrawBorderAround(PictureBox picBox)
-            //black border
-        {
-            Graphics g = this.CreateGraphics();
-            Pen pen = new Pen(Color.Black, 3);
-            Rectangle rect = picBox.Bounds;
-            rect.Inflate(3, 3);
-            g.DrawRectangle(pen, rect);
-            pen.Dispose();
-            g.Dispose();
+            labelMoney.Text = "Money: " + playerMoney.ToString("0.00");
+            UpdateColorLabels();
         }
 
         private void Timer1_Tick(object sender, EventArgs e)
         {
-            finalColor = RandomColor();
-            genBox.BackColor = finalColor;
+            finalColor1 = RandomColor();
+            finalColor2 = RandomColor();
+            finalColor3 = RandomColor();
+
+            Dice1.BackColor = finalColor1;
+            Dice2.BackColor = finalColor2;
+            Dice3.BackColor = finalColor3;
+
             timeLeft -= 0.1;
             CountDown.Text = "Time Left: " + timeLeft.ToString("0.0");
 
@@ -68,47 +79,78 @@ namespace colorGame
             {
                 colorTimer.Stop();
                 CountDown.Text = "Time Left: 0.0";
-                string resultName = ColorName(finalColor);
-                MessageBox.Show("The color is: " + resultName);
 
-                if (selectedColor.HasValue)
+                List<Color> diceColors = new List<Color> { finalColor1, finalColor2, finalColor3 };
+                double totalWinnings = 0;
+                int totalBet = betsPerColor.Values.Sum();
+
+                StringBuilder resultMessage = new StringBuilder();
+                resultMessage.AppendLine("Color\tBet\tWon\tWinnings");
+                resultMessage.AppendLine(divider);
+
+                foreach (var kvp in betsPerColor)
                 {
-                    if (selectedColor.Value == finalColor)
+                    Color betColor = kvp.Key;
+                    int betAmount = kvp.Value;
+                    int matchCount = diceColors.Count(c => c == betColor);
+                    int winnings = 0;
+                    if (matchCount > 0)
                     {
-                        win++;
-                        label3.Text = win.ToString();
-                        MessageBox.Show("🎉 You Win!");
+                        winnings = betAmount * (1 + matchCount);
                     }
-                    else
-                    {
-                        lose++;
-                        label4.Text = lose.ToString();
-                        MessageBox.Show("You lose! you select: " + ColorName(selectedColor.Value) + "\n❌ Try Again!");
-                    }
-                }
-                else
-                {
-                    MessageBox.Show("No color selected!");
+
+
+                    totalWinnings += winnings;
+
+                    string colorName = ColorName(betColor);
+                    resultMessage.AppendLine($"{colorName}\t{betAmount}\t{matchCount}\t{winnings}");
                 }
 
-                selectedColor = null;
-                this.Refresh();
+                playerMoney = playerMoney - totalBet + totalWinnings;
+                labelMoney.Text = "Money: " + playerMoney.ToString("0.00");
+
+                resultMessage.AppendLine(divider);
+                resultMessage.AppendLine($"Total Bet: {totalBet}");
+                resultMessage.AppendLine($"Total Won: {totalWinnings}");
+                resultMessage.AppendLine($"Current Money: {playerMoney.ToString("0.00")}");
+
+                MessageBox.Show(resultMessage.ToString(), "Result");
+
+
+                if (totalWinnings > 0) win++;
+                if (totalWinnings < totalBet) lose++;
+
+                label3.Text = win.ToString();
+                label4.Text = lose.ToString();
+
+                ResetBets();
+                UpdateColorLabels();
             }
         }
 
-
-        private string ColorName(Color color)
+        private void button1_Click(object sender, EventArgs e)
         {
-            if (color == Color.Yellow) return "Yellow";
-            if (color == Color.Pink) return "Pink";
-            if (color == Color.Red) return "Red";
-            if (color == Color.Orange) return "Orange";
-            if (color == Color.White) return "White";
-            if (color == Color.Blue) return "Blue";
-            return "Unknown";
+            int totalBet = betsPerColor.Values.Sum();
+
+            if (totalBet <= 0)
+            {
+                MessageBox.Show("Place at least one bet by clicking color boxes.");
+                return;
+            }
+
+            if (playerMoney <= 0)
+            {
+                MessageBox.Show("You have no money left to play.");
+                return;
+            }
+
+            timeLeft = 5.0;
+            CountDown.Text = "Time Left: 5.0";
+            startTime = DateTime.Now;
+            colorTimer.Start();
         }
 
-        private Color RandomColor() //randomize color return
+        private Color RandomColor()
         {
             List<Color> fixedColors = new List<Color>
             {
@@ -123,62 +165,102 @@ namespace colorGame
             return fixedColors[index];
         }
 
-        private void button1_Click(object sender, EventArgs e)
+        private string ColorName(Color color)
         {
-            if (!selectedColor.HasValue) //if user didn't select a color
-            {
-                MessageBox.Show("Please select a color before starting!");
-                return;
-            }
+            if (color == Color.Yellow) return "Yellow";
+            if (color == Color.Pink) return "Pink";
+            if (color == Color.Red) return "Red";
+            if (color == Color.Orange) return "Orange";
+            if (color == Color.White) return "White";
+            if (color == Color.Blue) return "Blue";
+            return "Unknown";
+        }
 
-            timeLeft = 5.0; //set timer to 5 sec in double
-            CountDown.Text = "Time Left: 5.0";
-            startTime = DateTime.Now;
-            colorTimer.Start(); //start the timer
+        private void ResetBets()
+        {
+            foreach (var color in betsPerColor.Keys.ToList())
+            {
+                betsPerColor[color] = 0;
+            }
+        }
+
+        private void UpdateColorLabels()
+        {
+            colorBox1.Refresh();
+            colorBox2.Refresh();
+            colorBox3.Refresh();
+            colorBox6.Refresh();
+            colorBox5.Refresh();
+            colorBox4.Refresh();
+
+            colorBox1.Invalidate();
+            colorBox2.Invalidate();
+            colorBox3.Invalidate();
+            colorBox6.Invalidate();
+            colorBox5.Invalidate();
+            colorBox4.Invalidate();
+        }
+
+        private void DrawBetAmount(PictureBox picBox, int amount)
+        {
+            using (Graphics g = picBox.CreateGraphics())
+            {
+                g.Clear(picBox.BackColor);
+                if (amount > 0)
+                {
+                    Font font = new Font("Arial", 10, FontStyle.Bold);
+                    Brush brush = Brushes.Black;
+                    g.DrawString("Bet: " + amount, font, brush, new PointF(5, 5));
+                }
+            }
+        }
+
+        private void ColorBox_Click(object sender, EventArgs e)
+        {
+            PictureBox clickedBox = sender as PictureBox;
+            Color clickedColor = colorMap[clickedBox];
+
+            int totalCurrentBet = betsPerColor.Values.Sum();
+
+            if (playerMoney > totalCurrentBet)
+            {
+                betsPerColor[clickedColor]++;
+                DrawBetAmount(clickedBox, betsPerColor[clickedColor]);
+            }
+            else
+            {
+                MessageBox.Show("You don't have enough money to bet!");
+            }
         }
 
         private void pictureBox2_Click(object sender, EventArgs e)
         {
-            selectedColor = Color.Yellow;
-            this.Refresh();
-            DrawBorderAround(colorBox1);
+            ColorBox_Click(colorBox1, e);
         }
 
         private void pictureBox3_Click(object sender, EventArgs e)
         {
-            selectedColor = Color.Pink;
-            this.Refresh();
-            DrawBorderAround(colorBox2);
+            ColorBox_Click(colorBox2, e);
         }
 
         private void pictureBox4_Click(object sender, EventArgs e)
         {
-            selectedColor = Color.Red;
-            this.Refresh();
-            DrawBorderAround(colorBox3);
+            ColorBox_Click(colorBox3, e);
         }
 
         private void pictureBox5_Click(object sender, EventArgs e)
         {
-            selectedColor = Color.Orange;
-            this.Refresh();
-            DrawBorderAround(colorBox6);
+            ColorBox_Click(colorBox6, e);
         }
 
         private void pictureBox6_Click(object sender, EventArgs e)
         {
-            selectedColor = Color.White;
-            this.Refresh();
-            DrawBorderAround(colorBox5);
+            ColorBox_Click(colorBox5, e);
         }
 
         private void pictureBox7_Click(object sender, EventArgs e)
         {
-            selectedColor = Color.Blue;
-            this.Refresh();
-            DrawBorderAround(colorBox4);
+            ColorBox_Click(colorBox4, e);
         }
-
-       
     }
 }
